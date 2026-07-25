@@ -59,7 +59,7 @@ authenticate → authorize → mint scoped capability token → validate → enf
 
 The gateway is a mesh of **8 single-purpose services** across **4 trust zones**. Only the edge is public; a default-deny network policy lets each service talk *only* to its legitimate caller.
 
-<p align="center"><img src="docs/images/architecture.svg" alt="Kybernos zero-trust architecture" width="100%"></p>
+<p align="center"><img src="docs/images/architecture.png" alt="Kybernos zero-trust architecture" width="100%"></p>
 
 <details><summary>▸ interactive Mermaid version of the diagram above</summary>
 
@@ -153,7 +153,7 @@ sequenceDiagram
 
 The edge is **always OpenAI-compatible**. A thin adapter (`src/common/providers.py`) translates to each backend's native wire format — and the security pipeline sits *downstream*, untouched by the choice of model.
 
-<p align="center"><img src="docs/images/provider-layer.svg" alt="Model-agnostic provider layer" width="100%"></p>
+<p align="center"><img src="docs/images/provider-layer.png" alt="Model-agnostic provider layer" width="100%"></p>
 
 <details><summary>▸ interactive Mermaid version of the diagram above</summary>
 
