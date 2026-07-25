@@ -1,21 +1,3 @@
-<div align="center">
-
-```
-               *
-              ***
-             *****
-            *******
-           *********
-          ***********
-         *****Psypher*****
-          *****Labs*****
-           ***********
-            *******
-             *****
-              ***
-               *
-```
-
 # 🛡️ Kybernos
 ### Zero-Trust Gateway for AI Agents · by Psypher Labs
 
