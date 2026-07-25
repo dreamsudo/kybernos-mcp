@@ -1,0 +1,23 @@
+# Secrets — never commit
+keys/
+secrets/
+deploy/docker/.env
+*.pem
+*.key
+
+# Runtime artifacts
+audit_artifacts/
+logs/
+__pycache__/
+*.pyc
+*.swp
+
+# local dev runner
+.local-run/
+
+# runtime sandbox contents (keep the dir for the compose mount)
+data/sandbox/*
+!data/sandbox/.gitkeep
+
+# corpus generator intermediate (contains raw secret-shaped test payloads)
+tests/corpus/generated_raw.json

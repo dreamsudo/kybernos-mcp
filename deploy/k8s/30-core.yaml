@@ -1,0 +1,118 @@
+# Core security pipeline: registry (authz), enforcer (validate+execute), ingress.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: service-registry, namespace: mcp-secure}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: service-registry}}
+  template:
+    metadata: {labels: {app: service-registry, tier: control}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: registry
+          image: mcp-universal:6.0
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "src.service_registry.main:app", "--host", "0.0.0.0", "--port", "8500"]
+          ports: [{containerPort: 8500}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          env:
+            - {name: CONFIG_PATH, value: /app/config}
+            - {name: REDIS_URL, value: "redis://redis-store:6379"}
+            - {name: PRIV_KEY_PATH, value: /app/keys/ecdsa_private.pem}
+            - {name: PUB_KEY_PATH, value: /app/keys/ecdsa_public.pem}
+          resources: {requests: {cpu: "50m", memory: "128Mi"}, limits: {cpu: "500m", memory: "256Mi"}}
+          readinessProbe: {httpGet: {path: /healthz, port: 8500}, initialDelaySeconds: 3, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /healthz, port: 8500}, initialDelaySeconds: 5, periodSeconds: 15}
+          volumeMounts:
+            - {name: config, mountPath: /app/config, readOnly: true}
+            - {name: keys, mountPath: /app/keys, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: config, configMap: {name: mcp-config}}
+        - {name: keys, secret: {secretName: mcp-keys}}
+        - {name: tmp, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: service-registry, namespace: mcp-secure}
+spec: {selector: {app: service-registry}, ports: [{port: 8500, targetPort: 8500}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: service-enforcer, namespace: mcp-secure}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: service-enforcer}}
+  template:
+    metadata: {labels: {app: service-enforcer, tier: control}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: enforcer
+          image: mcp-universal:6.0
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "src.service_enforcer.main:app", "--host", "0.0.0.0", "--port", "8650"]
+          ports: [{containerPort: 8650}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          env:
+            - {name: CONFIG_PATH, value: /app/config}
+            - {name: REDIS_URL, value: "redis://redis-store:6379"}
+            - {name: PUB_KEY_PATH, value: /app/keys/ecdsa_public.pem}
+            - {name: EGRESS_DLP, value: "true"}
+            - name: LOG_ENC_KEY_HEX
+              valueFrom: {secretKeyRef: {name: mcp-log-key, key: LOG_ENC_KEY_HEX}}
+          resources: {requests: {cpu: "50m", memory: "128Mi"}, limits: {cpu: "500m", memory: "256Mi"}}
+          readinessProbe: {httpGet: {path: /healthz, port: 8650}, initialDelaySeconds: 3, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /healthz, port: 8650}, initialDelaySeconds: 5, periodSeconds: 15}
+          volumeMounts:
+            - {name: config, mountPath: /app/config, readOnly: true}
+            - {name: keys, mountPath: /app/keys, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: config, configMap: {name: mcp-config}}
+        - {name: keys, secret: {secretName: mcp-keys}}
+        - {name: tmp, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: service-enforcer, namespace: mcp-secure}
+spec: {selector: {app: service-enforcer}, ports: [{port: 8650, targetPort: 8650}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: service-ingress, namespace: mcp-secure}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: service-ingress}}
+  template:
+    metadata: {labels: {app: service-ingress, tier: control}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: ingress
+          image: mcp-universal:6.0
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "src.service_ingress.main:app", "--host", "0.0.0.0", "--port", "8443"]
+          ports: [{containerPort: 8443}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          env:
+            - {name: CONFIG_PATH, value: /app/config}
+            - {name: REGISTRY_URL, value: "http://service-registry:8500/authorize"}
+            - {name: ENFORCER_URL, value: "http://service-enforcer:8650/execute"}
+            - name: LOG_ENC_KEY_HEX
+              valueFrom: {secretKeyRef: {name: mcp-log-key, key: LOG_ENC_KEY_HEX}}
+          resources: {requests: {cpu: "50m", memory: "128Mi"}, limits: {cpu: "500m", memory: "256Mi"}}
+          readinessProbe: {httpGet: {path: /healthz, port: 8443}, initialDelaySeconds: 3, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /healthz, port: 8443}, initialDelaySeconds: 5, periodSeconds: 15}
+          volumeMounts:
+            - {name: config, mountPath: /app/config, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: config, configMap: {name: mcp-config}}
+        - {name: tmp, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: service-ingress, namespace: mcp-secure}
+spec: {selector: {app: service-ingress}, ports: [{port: 8443, targetPort: 8443}]}

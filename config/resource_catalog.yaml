@@ -1,0 +1,72 @@
+resources:
+  resource_filesystem:
+    endpoint: "http://node-fs:8620"
+    timeout: 5.0
+    description: "Secure sandboxed file I/O. Restricted to specific file types."
+    schema:
+      type: "object"
+      properties:
+        action: 
+          type: "string"
+          enum: ["read", "list", "write"]
+          description: "Operation type."
+        path: 
+          type: "string"
+          # REGEX EXPLANATION:
+          # ^(?!/)          : Cannot start with / (No absolute paths)
+          # (?!.*\.\.)      : Cannot contain .. (No traversal)
+          # [a-zA-Z0-9_/.-]+: Allowed chars (Alphanumeric, underscore, slash, dot, dash)
+          # (\.txt|\.json|\.log|\.md|/)?$ : Must end in safe extension or be a directory
+          pattern: "^(?!/)(?!.*\\.\\.)[a-zA-Z0-9_/.-]+(\\.txt|\\.json|\\.log|\\.md|/)?$"
+          description: "Relative path. Must be .txt, .json, .log, .md or directory."
+        content:
+          type: "string"
+          maxLength: 10240 # 10KB Limit
+          pattern: "^[\\x20-\\x7E\\n\\r\\t]*$" # Printable ASCII only (No binary/nulls)
+      additionalProperties: false
+      required: ["action", "path"]
+
+  resource_database:
+    endpoint: "http://node-db:8610"
+    timeout: 5.0
+    description: "Read-only SQL execution."
+    schema:
+      type: "object"
+      properties:
+        query: 
+          type: "string"
+          maxLength: 512
+          # REGEX EXPLANATION:
+          # ^(?i)           : Case insensitive start
+          # (SELECT|SHOW)   : Only allow read verbs
+          # \s+             : Space required
+          # [a-zA-Z0-9_*,]+ : Allowed columns (Alphanumeric, star, comma)
+          # \s+FROM\s+      : FROM clause required
+          # [a-zA-Z0-9_]+$  : Table name (Alphanumeric)
+          pattern: "(?i)^(SELECT|SHOW|DESCRIBE)\\s+[a-zA-Z0-9_*,\\s]+\\s+FROM\\s+[a-zA-Z0-9_]+$"
+          description: "SQL Query. SELECT/SHOW only. No subqueries or unions."
+      additionalProperties: false
+      required: ["query"]
+
+  resource_network:
+    endpoint: "http://node-net:8630"
+    timeout: 10.0
+    description: "Restricted HTTP client."
+    schema:
+      type: "object"
+      properties:
+        url: 
+          type: "string"
+          format: "uri"
+          # REGEX EXPLANATION:
+          # ^https://       : Must be HTTPS
+          # [a-zA-Z0-9.-]+  : Domain name
+          # (/[...])?$      : Optional path
+          pattern: "^https://[a-zA-Z0-9.-]+(/[a-zA-Z0-9_/.-]*)?$"
+          maxLength: 256
+          description: "Target URL. HTTPS only. No IP addresses."
+        method: 
+          type: "string"
+          enum: ["GET"] # POST/PUT/DELETE removed
+      additionalProperties: false
+      required: ["url"]

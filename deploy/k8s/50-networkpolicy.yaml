@@ -1,0 +1,108 @@
+# Zero-trust east-west policy: default-deny ingress, then allow only each
+# service's legitimate caller. Traffic path is strictly:
+#   (outside) -> gateway -> ingress -> registry
+#                                   -> enforcer -> node-{fs,db,net}
+#   gateway/registry/enforcer -> redis
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny-ingress, namespace: mcp-secure}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# Allow all pods to resolve DNS (otherwise service discovery breaks under egress rules).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-dns-egress, namespace: mcp-secure}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to: [{namespaceSelector: {}}]
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+---
+# Gateway: the public edge. Reachable on 8000 (tighten `from` to your ingress
+# controller's namespace in production). Egress to ingress-svc, redis, and the
+# external LLM provider (443).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: gateway-policy, namespace: mcp-secure}
+spec:
+  podSelector: {matchLabels: {app: service-gateway}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports: [{protocol: TCP, port: 8000}]
+  egress:
+    - to: [{podSelector: {matchLabels: {app: service-ingress}}}]
+      ports: [{protocol: TCP, port: 8443}]
+    - to: [{podSelector: {matchLabels: {app: redis-store}}}]
+      ports: [{protocol: TCP, port: 6379}]
+    - ports: [{protocol: TCP, port: 443}]   # upstream model provider (cloud)
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: ingress-policy, namespace: mcp-secure}
+spec:
+  podSelector: {matchLabels: {app: service-ingress}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: service-gateway}}}]
+      ports: [{protocol: TCP, port: 8443}]
+  egress:
+    - to: [{podSelector: {matchLabels: {app: service-registry}}}]
+      ports: [{protocol: TCP, port: 8500}]
+    - to: [{podSelector: {matchLabels: {app: service-enforcer}}}]
+      ports: [{protocol: TCP, port: 8650}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: registry-policy, namespace: mcp-secure}
+spec:
+  podSelector: {matchLabels: {app: service-registry}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: service-ingress}}}]
+      ports: [{protocol: TCP, port: 8500}]
+  egress:
+    - to: [{podSelector: {matchLabels: {app: redis-store}}}]
+      ports: [{protocol: TCP, port: 6379}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: enforcer-policy, namespace: mcp-secure}
+spec:
+  podSelector: {matchLabels: {app: service-enforcer}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: service-ingress}}}]
+      ports: [{protocol: TCP, port: 8650}]
+  egress:
+    - to: [{podSelector: {matchLabels: {tier: worker}}}]
+    - to: [{podSelector: {matchLabels: {app: redis-store}}}]
+      ports: [{protocol: TCP, port: 6379}]
+---
+# Worker/tool nodes: only the enforcer may call them.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: workers-policy, namespace: mcp-secure}
+spec:
+  podSelector: {matchLabels: {tier: worker}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: service-enforcer}}}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: redis-policy, namespace: mcp-secure}
+spec:
+  podSelector: {matchLabels: {app: redis-store}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - {podSelector: {matchLabels: {app: service-gateway}}}
+        - {podSelector: {matchLabels: {app: service-registry}}}
+        - {podSelector: {matchLabels: {app: service-enforcer}}}
+      ports: [{protocol: TCP, port: 6379}]

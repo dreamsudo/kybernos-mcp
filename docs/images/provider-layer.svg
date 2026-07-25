@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="520" viewBox="0 0 940 520" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#495057"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="940" height="520" fill="#ffffff"/>
+  <text x="470" y="34" text-anchor="middle" font-size="21" font-weight="700" fill="#212529">Model-Agnostic Provider Layer</text>
+  <text x="470" y="56" text-anchor="middle" font-size="13" fill="#868e96">One OpenAI-compatible edge · pluggable wire adapters · security is downstream and unchanged</text>
+
+  <!-- edge -->
+  <rect x="330" y="78" width="280" height="46" rx="8" fill="#e7f5ff" stroke="#1c7ed6"/>
+  <text x="470" y="100" text-anchor="middle" font-size="14" font-weight="600" fill="#212529">service-gateway (OpenAI-compatible edge)</text>
+  <text x="470" y="116" text-anchor="middle" font-size="11.5" fill="#868e96">clients never change · POST /v1/chat/completions</text>
+
+  <!-- selector -->
+  <polygon points="470,148 560,178 470,208 380,178" fill="#fff3bf" stroke="#f08c00"/>
+  <text x="470" y="175" text-anchor="middle" font-size="12.5" font-weight="600" fill="#212529">get_adapter</text>
+  <text x="470" y="191" text-anchor="middle" font-size="11" fill="#868e96">provider.type</text>
+
+  <!-- adapters row -->
+  <g font-size="12.5">
+    <rect x="40" y="240" width="200" height="78" rx="8" fill="#fff4e6" stroke="#f08c00"/>
+    <text x="140" y="264" text-anchor="middle" font-weight="700" fill="#212529">AnthropicAdapter</text>
+    <text x="140" y="282" text-anchor="middle" fill="#868e96">native Messages API</text>
+    <text x="140" y="299" text-anchor="middle" fill="#868e96">tool_use / tool_result</text>
+
+    <rect x="256" y="240" width="150" height="78" rx="8" fill="#fff4e6" stroke="#f08c00"/>
+    <text x="331" y="264" text-anchor="middle" font-weight="700" fill="#212529">Bedrock</text>
+    <text x="331" y="282" text-anchor="middle" fill="#868e96">Claude on AWS</text>
+    <text x="331" y="299" text-anchor="middle" fill="#868e96">SigV4</text>
+
+    <rect x="422" y="240" width="150" height="78" rx="8" fill="#fff4e6" stroke="#f08c00"/>
+    <text x="497" y="264" text-anchor="middle" font-weight="700" fill="#212529">Vertex</text>
+    <text x="497" y="282" text-anchor="middle" fill="#868e96">Claude on GCP</text>
+    <text x="497" y="299" text-anchor="middle" fill="#868e96">bearer</text>
+
+    <rect x="588" y="240" width="150" height="78" rx="8" fill="#e9ecef" stroke="#868e96"/>
+    <text x="663" y="264" text-anchor="middle" font-weight="700" fill="#212529">GeminiAdapter</text>
+    <text x="663" y="282" text-anchor="middle" fill="#868e96">native generate</text>
+    <text x="663" y="299" text-anchor="middle" fill="#868e96">Content</text>
+
+    <rect x="754" y="240" width="150" height="78" rx="8" fill="#e9ecef" stroke="#868e96"/>
+    <text x="829" y="260" text-anchor="middle" font-weight="700" fill="#212529">OpenAIAdapter</text>
+    <text x="829" y="277" text-anchor="middle" fill="#868e96">OpenAI · Ollama</text>
+    <text x="829" y="293" text-anchor="middle" fill="#868e96">vLLM · LiteLLM</text>
+    <text x="829" y="309" text-anchor="middle" fill="#868e96">(default)</text>
+  </g>
+
+  <!-- security band -->
+  <rect x="40" y="360" width="864" height="66" rx="12" fill="#e6fcf5" stroke="#0ca678"/>
+  <text x="472" y="386" text-anchor="middle" font-size="14" font-weight="700" fill="#099268">🔒 Security pipeline — provider-independent</text>
+  <text x="472" y="408" text-anchor="middle" font-size="12.5" fill="#212529">RBAC · ES256 capability tokens · JSON-Schema · 112-rule firewall · egress-DLP · AES-256-GCM audit</text>
+
+  <text x="470" y="462" text-anchor="middle" font-size="12.5" font-style="italic" fill="#495057">Switching providers is a config entry — it never changes a single security control.</text>
+  <text x="470" y="482" text-anchor="middle" font-size="12" fill="#868e96">Anthropic responses are normalized back to an OpenAI chat.completion, so the edge stays uniform.</text>
+
+  <!-- arrows -->
+  <line x1="470" y1="124" x2="470" y2="148" stroke="#495057" stroke-width="1.6" marker-end="url(#a2)"/>
+  <line x1="440" y1="196" x2="140" y2="240" stroke="#495057" stroke-width="1.4" marker-end="url(#a2)"/>
+  <line x1="455" y1="200" x2="331" y2="240" stroke="#495057" stroke-width="1.4" marker-end="url(#a2)"/>
+  <line x1="480" y1="200" x2="497" y2="240" stroke="#495057" stroke-width="1.4" marker-end="url(#a2)"/>
+  <line x1="495" y1="200" x2="663" y2="240" stroke="#495057" stroke-width="1.4" marker-end="url(#a2)"/>
+  <line x1="505" y1="196" x2="829" y2="240" stroke="#495057" stroke-width="1.4" marker-end="url(#a2)"/>
+  <line x1="472" y1="318" x2="472" y2="360" stroke="#0ca678" stroke-width="1.8" marker-end="url(#a2)"/>
+  <text x="486" y="342" font-size="11.5" fill="#099268">{ principal, resource, payload }</text>
+</svg>

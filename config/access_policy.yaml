@@ -1,0 +1,29 @@
+access_control_list:
+  # 1. The Analyst (Standard User)
+  # Can read files and DB. Cannot use network.
+  principal_analyst:
+    allowed_resources: 
+      - "resource_filesystem"
+      - "resource_database"
+
+  # 2. The Auditor (Read Only)
+  # Can only list files and read DB. No writing.
+  principal_auditor:
+    allowed_resources:
+      - "resource_database"
+
+  # 3. The Network Bot (External Only)
+  # Can only use network. No disk/db access.
+  principal_netbot:
+    allowed_resources:
+      - "resource_network"
+
+  # 4. The Admin (Elevated)
+  # Full access, but still subject to schema validation + firewall.
+  # `admin: true` additionally unlocks the /runtime/sbom policy-disclosure endpoint.
+  principal_admin:
+    admin: true
+    allowed_resources:
+      - "resource_filesystem"
+      - "resource_database"
+      - "resource_network"

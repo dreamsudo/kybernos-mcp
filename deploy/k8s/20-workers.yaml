@@ -1,0 +1,94 @@
+# Worker/tool nodes. node-db and node-net are MOCKS in this repo — replace their
+# images/backends with real, least-privilege connectors before production use.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: node-fs, namespace: mcp-secure}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: node-fs}}
+  template:
+    metadata: {labels: {app: node-fs, tier: worker}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: node-fs
+          image: mcp-universal:6.0
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "src.worker_nodes.node_fs:app", "--host", "0.0.0.0", "--port", "8620"]
+          ports: [{containerPort: 8620}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          resources: {requests: {cpu: "25m", memory: "64Mi"}, limits: {cpu: "250m", memory: "128Mi"}}
+          readinessProbe: {httpGet: {path: /healthz, port: 8620}, initialDelaySeconds: 3, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /healthz, port: 8620}, initialDelaySeconds: 5, periodSeconds: 15}
+          volumeMounts:
+            - {name: sandbox, mountPath: /app/data/sandbox}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        # Ephemeral demo storage. For production swap for a PersistentVolumeClaim.
+        - {name: sandbox, emptyDir: {sizeLimit: 512Mi}}
+        - {name: tmp, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: node-fs, namespace: mcp-secure}
+spec:
+  selector: {app: node-fs}
+  ports: [{port: 8620, targetPort: 8620}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: node-db, namespace: mcp-secure}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: node-db}}
+  template:
+    metadata: {labels: {app: node-db, tier: worker}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: node-db
+          image: mcp-universal:6.0
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "src.worker_nodes.node_db:app", "--host", "0.0.0.0", "--port", "8610"]
+          ports: [{containerPort: 8610}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          resources: {requests: {cpu: "25m", memory: "64Mi"}, limits: {cpu: "250m", memory: "128Mi"}}
+          readinessProbe: {httpGet: {path: /healthz, port: 8610}, initialDelaySeconds: 3, periodSeconds: 10}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: node-db, namespace: mcp-secure}
+spec:
+  selector: {app: node-db}
+  ports: [{port: 8610, targetPort: 8610}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: node-net, namespace: mcp-secure}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: node-net}}
+  template:
+    metadata: {labels: {app: node-net, tier: worker}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: node-net
+          image: mcp-universal:6.0
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "src.worker_nodes.node_net:app", "--host", "0.0.0.0", "--port", "8630"]
+          ports: [{containerPort: 8630}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          resources: {requests: {cpu: "25m", memory: "64Mi"}, limits: {cpu: "250m", memory: "128Mi"}}
+          readinessProbe: {httpGet: {path: /healthz, port: 8630}, initialDelaySeconds: 3, periodSeconds: 10}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: node-net, namespace: mcp-secure}
+spec:
+  selector: {app: node-net}
+  ports: [{port: 8630, targetPort: 8630}]

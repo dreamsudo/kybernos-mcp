@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-store
+  namespace: mcp-secure
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: redis-store}}
+  template:
+    metadata:
+      labels: {app: redis-store, tier: state}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ["redis-server", "--save", "", "--appendonly", "no"]
+          ports: [{containerPort: 6379}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: data, mountPath: /data}]
+          resources:
+            requests: {cpu: "50m", memory: "64Mi"}
+            limits: {cpu: "250m", memory: "256Mi"}
+          livenessProbe:
+            tcpSocket: {port: 6379}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            exec: {command: ["redis-cli", "ping"]}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+      volumes: [{name: data, emptyDir: {medium: Memory, sizeLimit: 128Mi}}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-store
+  namespace: mcp-secure
+spec:
+  selector: {app: redis-store}
+  ports: [{port: 6379, targetPort: 6379}]

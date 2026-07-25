@@ -1,0 +1,9 @@
+keys/
+secrets/
+audit_artifacts/
+logs/
+deploy/k8s/
+**/__pycache__/
+*.pyc
+.git/
+.gitignore

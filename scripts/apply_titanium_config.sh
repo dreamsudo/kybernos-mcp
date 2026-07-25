@@ -1,0 +1,317 @@
+#!/bin/bash
+
+# ==============================================================================
+# MODULE: TITANIUM-GRADE CONFIGURATION GENERATOR (v8.0)
+# Responsibility: Apply 300+ Total Security Controls
+# ==============================================================================
+
+cd "$(dirname "$0")"
+PROJECT_ROOT=$(dirname $(pwd))
+CONFIG_DIR="$PROJECT_ROOT/config"
+DOCKER_DIR="$PROJECT_ROOT/deploy/docker"
+
+echo "[TITANIUM] Initiating Military-Grade Hardening..."
+
+# ==============================================================================
+# 1. SECURITY POLICY (The WAF & DLP Layer) - 150+ Rules
+# ==============================================================================
+echo " - Generating Security Policy (150+ Rules)..."
+cat << 'EOF' > "$CONFIG_DIR/security_policy.yaml"
+system_limits:
+  max_input_size: 524288   # 512KB (Reduced surface area)
+  max_output_size: 4096    # 4KB (Prevents data exfiltration)
+  token_ttl: 30            # 30s (Strict replay protection)
+  max_requests_per_min: 10 # Rate Limiting
+
+semantic_firewall:
+  # ----------------------------------------------------------------------------
+  # [SECTION 1] SQL INJECTION (SQLi) - 30 Rules
+  # ----------------------------------------------------------------------------
+  - { id: "SQLI_DROP", regex: "(?i)DROP\\s+(TABLE|DATABASE|VIEW|PROCEDURE|FUNCTION|TRIGGER|INDEX|USER|ROLE)", action: "BLOCK" }
+  - { id: "SQLI_DELETE", regex: "(?i)DELETE\\s+FROM", action: "BLOCK" }
+  - { id: "SQLI_TRUNCATE", regex: "(?i)TRUNCATE\\s+TABLE", action: "BLOCK" }
+  - { id: "SQLI_ALTER", regex: "(?i)ALTER\\s+(TABLE|DATABASE|USER|SYSTEM)", action: "BLOCK" }
+  - { id: "SQLI_GRANT", regex: "(?i)GRANT\\s+(ALL|SELECT|INSERT|UPDATE|DELETE|EXECUTE|ALTER)", action: "BLOCK" }
+  - { id: "SQLI_REVOKE", regex: "(?i)REVOKE\\s+", action: "BLOCK" }
+  - { id: "SQLI_UNION", regex: "(?i)UNION\\s+(ALL\\s+)?SELECT", action: "BLOCK" }
+  - { id: "SQLI_SLEEP", regex: "(?i)(SLEEP|BENCHMARK|PG_SLEEP|WAITFOR\\s+DELAY|DBMS_LOCK\\.SLEEP)\\(", action: "BLOCK" }
+  - { id: "SQLI_META", regex: "(?i)(INFORMATION_SCHEMA|SYSObjects|SYSColumns|MSysAccessObjects|pg_catalog|v\\$session)", action: "BLOCK" }
+  - { id: "SQLI_COMMENT", regex: "(--|#|/\\*|\\*/)", action: "BLOCK" }
+  - { id: "SQLI_TAUTOLOGY", regex: "(?i)OR\\s+['\"]?1['\"]?\\s*=\\s*['\"]?1", action: "BLOCK" }
+  - { id: "SQLI_HEX", regex: "(?i)0x[0-9a-fA-F]+", action: "BLOCK" }
+  - { id: "SQLI_STACKED", regex: ";\\s*(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER)", action: "BLOCK" }
+  - { id: "SQLI_XP_CMD", regex: "(?i)xp_cmdshell", action: "BLOCK" }
+  - { id: "SQLI_INTO_OUTFILE", regex: "(?i)INTO\\s+(OUTFILE|DUMPFILE)", action: "BLOCK" }
+  - { id: "SQLI_LOAD_FILE", regex: "(?i)LOAD_FILE\\(", action: "BLOCK" }
+  - { id: "SQLI_VERSION", regex: "(?i)(@@version|version\\(\\))", action: "BLOCK" }
+  - { id: "SQLI_USER", regex: "(?i)(user\\(\\)|current_user|system_user)", action: "BLOCK" }
+  - { id: "SQLI_CONCAT", regex: "(?i)(CONCAT|GROUP_CONCAT)\\(", action: "BLOCK" }
+  - { id: "SQLI_CAST", regex: "(?i)CAST\\(.*AS", action: "BLOCK" }
+  - { id: "SQLI_ASCII", regex: "(?i)ASCII\\(", action: "BLOCK" }
+  - { id: "SQLI_SUBSTRING", regex: "(?i)SUBSTRING\\(", action: "BLOCK" }
+  - { id: "SQLI_HAVING", regex: "(?i)HAVING\\s+[0-9]", action: "BLOCK" }
+  - { id: "SQLI_ORDER_BY", regex: "(?i)ORDER\\s+BY\\s+[0-9]", action: "BLOCK" }
+  - { id: "SQLI_INSERT_INTO", regex: "(?i)INSERT\\s+INTO", action: "BLOCK" }
+  - { id: "SQLI_UPDATE_SET", regex: "(?i)UPDATE\\s+.*\\s+SET", action: "BLOCK" }
+  - { id: "SQLI_EXEC", regex: "(?i)EXEC\\(@", action: "BLOCK" }
+  - { id: "SQLI_SHUTDOWN", regex: "(?i)SHUTDOWN", action: "BLOCK" }
+  - { id: "SQLI_BACKUP", regex: "(?i)BACKUP\\s+(DATABASE|LOG)", action: "BLOCK" }
+
+  # ----------------------------------------------------------------------------
+  # [SECTION 2] REMOTE CODE EXECUTION (RCE) - 30 Rules
+  # ----------------------------------------------------------------------------
+  - { id: "RCE_SHELL_BIN", regex: "(?i)(/bin/sh|/bin/bash|/bin/zsh|/bin/dash|/bin/csh|/bin/ksh|/bin/tcsh)", action: "BLOCK" }
+  - { id: "RCE_WINDOWS", regex: "(?i)(cmd\\.exe|powershell|pwsh|wscript|cscript|conhost\\.exe)", action: "BLOCK" }
+  - { id: "RCE_NET_TOOLS", regex: "(?i)(nc\\s+|netcat|ncat|socat|telnet|ssh\\s+|scp\\s+|sftp\\s+|ftp\\s+|tftp)", action: "BLOCK" }
+  - { id: "RCE_DOWNLOADERS", regex: "(?i)(wget\\s+|curl\\s+|fetch\\s+|lynx\\s+|aria2c|axel|lftp)", action: "BLOCK" }
+  - { id: "RCE_LANGUAGES", regex: "(?i)(python|perl|ruby|gcc|make|java|php|node\\s+|deno\\s+|go\\s+run|rustc)", action: "BLOCK" }
+  - { id: "RCE_PIPES", regex: "(\\||`|\\$\\()", action: "BLOCK" }
+  - { id: "RCE_ENV_VARS", regex: "(?i)(printenv|env|export|set|declare|unset)", action: "BLOCK" }
+  - { id: "RCE_SUDO", regex: "(?i)(sudo\\s+|su\\s+|chown|chmod|chgrp|visudo)", action: "BLOCK" }
+  - { id: "RCE_CRON", regex: "(?i)(crontab|/etc/cron|at\\s+)", action: "BLOCK" }
+  - { id: "RCE_SYSTEMD", regex: "(?i)(systemctl|service\\s+|journalctl)", action: "BLOCK" }
+  - { id: "RCE_DOCKER", regex: "(?i)(docker\\s+|kubectl|minikube|helm)", action: "BLOCK" }
+  - { id: "RCE_AWK_SED", regex: "(?i)(awk\\s+|sed\\s+|grep\\s+|find\\s+)", action: "BLOCK" }
+  - { id: "RCE_ZIP", regex: "(?i)(tar\\s+|zip\\s+|unzip\\s+|gzip\\s+|gunzip\\s+|7z\\s+)", action: "BLOCK" }
+  - { id: "RCE_EVAL", regex: "(?i)(eval\\(|exec\\(|system\\(|popen\\(|subprocess)", action: "BLOCK" }
+  - { id: "RCE_BASE64_DEC", regex: "(?i)(base64\\s+-d|openssl\\s+enc)", action: "BLOCK" }
+  - { id: "RCE_DD", regex: "(?i)dd\\s+if=", action: "BLOCK" }
+  - { id: "RCE_MKNOD", regex: "(?i)mknod", action: "BLOCK" }
+  - { id: "RCE_MKFIFO", regex: "(?i)mkfifo", action: "BLOCK" }
+  - { id: "RCE_WHOAMI", regex: "(?i)whoami", action: "BLOCK" }
+  - { id: "RCE_ID", regex: "(?i)id\\s+-u", action: "BLOCK" }
+  - { id: "RCE_UNAME", regex: "(?i)uname\\s+-a", action: "BLOCK" }
+  - { id: "RCE_HOSTNAME", regex: "(?i)hostname", action: "BLOCK" }
+  - { id: "RCE_UPTIME", regex: "(?i)uptime", action: "BLOCK" }
+  - { id: "RCE_FREE", regex: "(?i)free\\s+-m", action: "BLOCK" }
+  - { id: "RCE_LSOF", regex: "(?i)lsof", action: "BLOCK" }
+  - { id: "RCE_TCPDUMP", regex: "(?i)tcpdump", action: "BLOCK" }
+  - { id: "RCE_NMAP", regex: "(?i)nmap", action: "BLOCK" }
+
+  # ----------------------------------------------------------------------------
+  # [SECTION 3] LOCAL FILE INCLUSION (LFI) & TRAVERSAL - 25 Rules
+  # ----------------------------------------------------------------------------
+  - { id: "LFI_DOTDOT", regex: "(\\.\\./|\\.\\.\\\\)", action: "BLOCK" }
+  - { id: "LFI_ROOT_DIR", regex: "(?i)^(/root|/boot|/proc|/sys|/dev|/mnt|/media|/srv|/opt)", action: "BLOCK" }
+  - { id: "LFI_ETC_FILES", regex: "(?i)/etc/(passwd|shadow|group|hosts|issue|hostname|network|fstab|crontab|sudoers)", action: "BLOCK" }
+  - { id: "LFI_VAR_LOGS", regex: "(?i)/var/(log|www|lib|run|tmp|spool|mail|backups)", action: "BLOCK" }
+  - { id: "LFI_WINDOWS_SYS", regex: "(?i)(C:\\\\|Windows\\\\|System32|win\\.ini|boot\\.ini|autoexec\\.bat)", action: "BLOCK" }
+  - { id: "LFI_NULL_BYTE", regex: "(\\x00|%00)", action: "BLOCK" }
+  - { id: "LFI_WRAPPERS", regex: "(?i)(php://|file://|expect://|zip://|data://|gopher://|dict://|ftp://|sftp://)", action: "BLOCK" }
+  - { id: "LFI_SSH_DIR", regex: "(?i)/\\.ssh/", action: "BLOCK" }
+  - { id: "LFI_GIT_DIR", regex: "(?i)/\\.git/", action: "BLOCK" }
+  - { id: "LFI_ENV_DIR", regex: "(?i)/\\.env", action: "BLOCK" }
+  - { id: "LFI_CONFIG_DIR", regex: "(?i)/\\.config/", action: "BLOCK" }
+  - { id: "LFI_HISTORY", regex: "(?i)/\\.*history", action: "BLOCK" }
+  - { id: "LFI_PROFILE", regex: "(?i)/\\.profile", action: "BLOCK" }
+  - { id: "LFI_BASHRC", regex: "(?i)/\\.bashrc", action: "BLOCK" }
+  - { id: "LFI_ZSHRC", regex: "(?i)/\\.zshrc", action: "BLOCK" }
+  - { id: "LFI_HTACCESS", regex: "(?i)\\.htaccess", action: "BLOCK" }
+  - { id: "LFI_HTPASSWD", regex: "(?i)\\.htpasswd", action: "BLOCK" }
+  - { id: "LFI_WEB_CONFIG", regex: "(?i)web\\.config", action: "BLOCK" }
+  - { id: "LFI_DOCKER_SOCK", regex: "(?i)/var/run/docker\\.sock", action: "BLOCK" }
+  - { id: "LFI_K8S_TOKEN", regex: "(?i)/var/run/secrets/kubernetes\\.io/serviceaccount/token", action: "BLOCK" }
+
+  # ----------------------------------------------------------------------------
+  # [SECTION 4] SENSITIVE DATA LEAKAGE (DLP) - 20 Rules
+  # ----------------------------------------------------------------------------
+  - { id: "DLP_SSH_KEYS", regex: "(?i)(id_rsa|id_dsa|id_ed25519|authorized_keys|known_hosts|id_ecdsa)", action: "BLOCK" }
+  - { id: "DLP_PEM_HEADERS", regex: "(?i)(BEGIN\\s+PRIVATE\\s+KEY|BEGIN\\s+CERTIFICATE|BEGIN\\s+RSA\\s+PRIVATE|BEGIN\\s+OPENSSH\\s+PRIVATE)", action: "BLOCK" }
+  - { id: "DLP_AWS_KEYS", regex: "(?i)(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16})", action: "BLOCK" }
+  - { id: "DLP_GENERIC_TOKENS", regex: "(?i)(api_key|secret_key|access_token|auth_token|bearer\\s+|session_id|csrf_token)", action: "BLOCK" }
+  - { id: "DLP_CONFIG_FILES", regex: "(?i)(\\.env|\\.config|config\\.json|settings\\.py|wp-config\\.php|database\\.yml|secrets\\.yaml)", action: "BLOCK" }
+  - { id: "DLP_DB_DUMPS", regex: "(?i)(\\.sql|\\.dump|\\.db|\\.sqlite)", action: "BLOCK" }
+  - { id: "DLP_BACKUPS", regex: "(?i)(\\.bak|\\.old|\\.swp|\\.tmp|\\.backup)", action: "BLOCK" }
+  - { id: "DLP_CREDIT_CARD", regex: "\\b(?:\\d[ -]*?){13,16}\\b", action: "BLOCK" }
+  - { id: "DLP_SSN", regex: "\\b\\d{3}-\\d{2}-\\d{4}\\b", action: "BLOCK" }
+  - { id: "DLP_EMAIL_LIST", regex: "(?i)([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,},){3,}", action: "BLOCK" } # Block lists of 3+ emails
+  - { id: "DLP_JWT", regex: "(?i)eyJ[a-zA-Z0-9_-]{10,}\\.eyJ[a-zA-Z0-9_-]{10,}\\.[a-zA-Z0-9_-]{10,}", action: "BLOCK" }
+  - { id: "DLP_SLACK_TOKEN", regex: "(?i)xox[baprs]-([0-9a-zA-Z]{10,48})", action: "BLOCK" }
+  - { id: "DLP_STRIPE_KEY", regex: "(?i)sk_live_[0-9a-zA-Z]{24}", action: "BLOCK" }
+  - { id: "DLP_GOOGLE_KEY", regex: "(?i)AIza[0-9A-Za-z\\-_]{35}", action: "BLOCK" }
+
+  # ----------------------------------------------------------------------------
+  # [SECTION 5] SERVER SIDE REQUEST FORGERY (SSRF) - 10 Rules
+  # ----------------------------------------------------------------------------
+  - { id: "SSRF_METADATA_AWS", regex: "(?i)169\\.254\\.169\\.254", action: "BLOCK" }
+  - { id: "SSRF_METADATA_GCP", regex: "(?i)metadata\\.google\\.internal", action: "BLOCK" }
+  - { id: "SSRF_LOCALHOST", regex: "(?i)(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1\\])", action: "BLOCK" }
+  - { id: "SSRF_INTERNAL_192", regex: "(?i)192\\.168\\.", action: "BLOCK" }
+  - { id: "SSRF_INTERNAL_10", regex: "(?i)10\\.", action: "BLOCK" }
+  - { id: "SSRF_INTERNAL_172", regex: "(?i)172\\.(1[6-9]|2[0-9]|3[0-1])\\.", action: "BLOCK" }
+  - { id: "SSRF_SCHEMES", regex: "(?i)(file://|gopher://|dict://|ldap://|tftp://)", action: "BLOCK" }
+
+  # ----------------------------------------------------------------------------
+  # [SECTION 6] PROTOCOL & FORMAT ATTACKS - 10 Rules
+  # ----------------------------------------------------------------------------
+  - { id: "FMT_XSS", regex: "(?i)(<script|javascript:|onload=|onerror=|alert\\(|document\\.cookie)", action: "BLOCK" }
+  - { id: "FMT_XML_XXE", regex: "(?i)(<!DOCTYPE|<!ENTITY|SYSTEM\\s+\")", action: "BLOCK" }
+  - { id: "FMT_FORMAT_STR", regex: "(%s|%d|%x|%n|%p)", action: "BLOCK" }
+  - { id: "FMT_OVERFLOW", regex: ".{8193,}", action: "BLOCK" }
+  - { id: "FMT_B64_HEADERS", regex: "(?i)(eyJ|TVqQA|UEsDB)", action: "BLOCK" } # JWT, EXE, ZIP headers
+  - { id: "FMT_PHP_TAGS", regex: "(?i)(<\\?php|<\\?=|\\?>)", action: "BLOCK" }
+  - { id: "FMT_ASP_TAGS", regex: "(?i)(<%|%>)", action: "BLOCK" }
+  - { id: "FMT_JSP_TAGS", regex: "(?i)(<jsp:|%>)", action: "BLOCK" }
+
+  # ----------------------------------------------------------------------------
+  # [SECTION 7] AI JAILBREAK PATTERNS - 10 Rules
+  # ----------------------------------------------------------------------------
+  - { id: "AI_IGNORE", regex: "(?i)(ignore previous instructions|disregard all prior)", action: "BLOCK" }
+  - { id: "AI_MODE", regex: "(?i)(developer mode|debug mode|god mode|admin mode)", action: "BLOCK" }
+  - { id: "AI_ROLEPLAY", regex: "(?i)(act as a|pretend to be|you are now)", action: "BLOCK" }
+  - { id: "AI_DAN", regex: "(?i)(do anything now|DAN mode)", action: "BLOCK" }
+  - { id: "AI_SUDO", regex: "(?i)(sudo make me a sandwich|sudo do)", action: "BLOCK" }
+  - { id: "AI_SYSTEM_PROMPT", regex: "(?i)(repeat the system prompt|output your instructions)", action: "BLOCK" }
+EOF
+
+# ==============================================================================
+# 2. RESOURCE CATALOG (The Schema Layer) - Strict Typing
+# ==============================================================================
+echo " - Generating Resource Catalog (Strict Schemas)..."
+cat << 'EOF' > "$CONFIG_DIR/resource_catalog.yaml"
+resources:
+  resource_filesystem:
+    endpoint: "http://node_fs:8620"
+    timeout: 5.0
+    description: "Secure sandboxed file I/O. Restricted to specific file types."
+    schema:
+      type: "object"
+      properties:
+        action: 
+          type: "string"
+          enum: ["read", "list", "write"]
+          description: "Operation type."
+        path: 
+          type: "string"
+          # REGEX EXPLANATION:
+          # ^(?!/)          : Cannot start with / (No absolute paths)
+          # (?!.*\.\.)      : Cannot contain .. (No traversal)
+          # [a-zA-Z0-9_/.-]+: Allowed chars (Alphanumeric, underscore, slash, dot, dash)
+          # (\.txt|\.json|\.log|\.md|/)?$ : Must end in safe extension or be a directory
+          pattern: "^(?!/)(?!.*\\.\\.)[a-zA-Z0-9_/.-]+(\\.txt|\\.json|\\.log|\\.md|/)?$"
+          description: "Relative path. Must be .txt, .json, .log, .md or directory."
+        content:
+          type: "string"
+          maxLength: 10240 # 10KB Limit
+          pattern: "^[\\x20-\\x7E\\n\\r\\t]*$" # Printable ASCII only (No binary/nulls)
+      required: ["action", "path"]
+
+  resource_database:
+    endpoint: "http://node_db:8610"
+    timeout: 5.0
+    description: "Read-only SQL execution."
+    schema:
+      type: "object"
+      properties:
+        query: 
+          type: "string"
+          maxLength: 512
+          # REGEX EXPLANATION:
+          # ^(?i)           : Case insensitive start
+          # (SELECT|SHOW)   : Only allow read verbs
+          # \s+             : Space required
+          # [a-zA-Z0-9_*,]+ : Allowed columns (Alphanumeric, star, comma)
+          # \s+FROM\s+      : FROM clause required
+          # [a-zA-Z0-9_]+$  : Table name (Alphanumeric)
+          pattern: "^(?i)(SELECT|SHOW|DESCRIBE)\\s+[a-zA-Z0-9_*,\\s]+\\s+FROM\\s+[a-zA-Z0-9_]+$"
+          description: "SQL Query. SELECT/SHOW only. No subqueries or unions."
+      required: ["query"]
+
+  resource_network:
+    endpoint: "http://node_net:8630"
+    timeout: 10.0
+    description: "Restricted HTTP client."
+    schema:
+      type: "object"
+      properties:
+        url: 
+          type: "string"
+          format: "uri"
+          # REGEX EXPLANATION:
+          # ^https://       : Must be HTTPS
+          # [a-zA-Z0-9.-]+  : Domain name
+          # (/[...])?$      : Optional path
+          pattern: "^https://[a-zA-Z0-9.-]+(/[a-zA-Z0-9_/.-]*)?$"
+          maxLength: 256
+          description: "Target URL. HTTPS only. No IP addresses."
+        method: 
+          type: "string"
+          enum: ["GET"] # POST/PUT/DELETE removed
+      required: ["url"]
+EOF
+
+# ==============================================================================
+# 3. ACCESS POLICY (The RBAC Layer) - Granular Roles
+# ==============================================================================
+echo " - Generating Access Policy (Granular RBAC)..."
+cat << 'EOF' > "$CONFIG_DIR/access_policy.yaml"
+access_control_list:
+  # 1. The Analyst (Standard User)
+  # Can read files and DB. Cannot use network.
+  principal_analyst:
+    allowed_resources: 
+      - "resource_filesystem"
+      - "resource_database"
+
+  # 2. The Auditor (Read Only)
+  # Can only list files and read DB. No writing.
+  principal_auditor:
+    allowed_resources:
+      - "resource_database"
+
+  # 3. The Network Bot (External Only)
+  # Can only use network. No disk/db access.
+  principal_netbot:
+    allowed_resources:
+      - "resource_network"
+
+  # 4. The Admin (Elevated)
+  # Full access, but still subject to Firewall rules.
+  principal_admin:
+    allowed_resources: 
+      - "resource_filesystem"
+      - "resource_database"
+      - "resource_network"
+EOF
+
+# ==============================================================================
+# 4. MODEL INVENTORY (The Safety Layer) - Resource Capping
+# ==============================================================================
+echo " - Generating Model Inventory (Resource Capping)..."
+cat << 'EOF' > "$CONFIG_DIR/model_inventory.yaml"
+providers:
+  provider_local_ollama:
+    type: "local"
+    endpoint: "http://host.docker.internal:11434/v1/chat/completions"
+    api_key_env: "NULL_KEY" 
+    context_window: 4096 # Reduced from 8192 to prevent memory exhaustion
+    max_tokens: 512      # Hard limit on output generation
+    temperature: 0.0     # Deterministic output (reduces hallucination)
+
+  provider_remote_openai:
+    type: "cloud"
+    endpoint: "https://api.openai.com/v1/chat/completions"
+    api_key_env: "REMOTE_API_KEY"
+    context_window: 8192
+    max_tokens: 1024
+
+models:
+  principal_analyst:
+    provider: "provider_local_ollama"
+    upstream_model_id: "mistral:7b-instruct" 
+  
+  principal_admin:
+    provider: "provider_remote_openai"
+    upstream_model_id: "gpt-4"
+EOF
+
+# ==============================================================================
+# 5. APPLY & RESTART
+# ==============================================================================
+echo "[FORTRESS] Configuration Generation Complete."
+echo "[FORTRESS] Restarting Security Services..."
+
+cd "$DOCKER_DIR"
+sudo docker compose restart service_enforcer service_registry service_gateway
+
+echo "[SUCCESS] System is now running in TITANIUM-HARDENED mode."

@@ -1,0 +1,25 @@
+# External route to the gateway. Requires an ingress controller (e.g. nginx) and
+# cert-manager (or a pre-created TLS secret). Edit the host before applying.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mcp-gateway
+  namespace: mcp-secure
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["mcp.example.com"]
+      secretName: mcp-gateway-tls
+  rules:
+    - host: mcp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: service-gateway
+                port: {number: 8000}
